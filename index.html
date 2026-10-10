@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cadência">
+<title>Cadência por km</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F5; --panel:#FFFFFF; --ink:#14202B; --muted:#5B6B7A; --line:#D3DBE2;
+  --blue:#1F4FD8; --blue-soft:#DCE5FB; --amber:#FFB020; --red:#D6324A; --ok:#1E9E5A;
+  --num:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --txt:"Barlow", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1621; --panel:#172231; --ink:#E8EEF4; --muted:#93A3B4; --line:#2A3A4D;
+    --blue:#6E93FF; --blue-soft:#22325A; --amber:#FFB020; --red:#FF6B7F; --ok:#4CD38A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1621; --panel:#172231; --ink:#E8EEF4; --muted:#93A3B4; --line:#2A3A4D;
+  --blue:#6E93FF; --blue-soft:#22325A; --amber:#FFB020; --red:#FF6B7F; --ok:#4CD38A;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--txt);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+main{max-width:520px;margin:0 auto;padding:16px 16px 40px}
+h1{font-family:var(--num);font-weight:700;font-size:1.6rem;margin:4px 0 14px;letter-spacing:.01em}
+h2{font-family:var(--num);font-weight:600;font-size:1.3rem;margin:0 0 10px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+/* Painel ao vivo */
+.live{background:var(--panel);border-radius:22px;padding:18px 18px 16px;border:1px solid var(--line)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:.95rem}
+.gps{display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.dot.good{background:var(--ok)} .dot.weak{background:var(--amber)} .dot.bad{background:var(--red)}
+.cad{display:flex;align-items:flex-end;gap:10px;margin:6px 0 2px}
+.cad .n{font-family:var(--num);font-weight:700;font-size:clamp(6rem,30vw,9rem);line-height:.85;font-variant-numeric:tabular-nums}
+.cad .u{font-family:var(--num);font-size:1.4rem;color:var(--muted);padding-bottom:10px}
+.beat{height:8px;border-radius:4px;background:var(--blue-soft);overflow:hidden;margin:8px 0 14px}
+.beat i{display:block;height:100%;width:100%;background:var(--blue);opacity:0;transition:opacity .12s ease-out}
+.beat i.on{opacity:1;transition:none}
+.next{font-size:1rem;margin-bottom:12px}
+.next b{font-weight:600}
+
+/* Pista de trechos */
+.track{display:flex;gap:3px;height:34px;position:relative;margin-bottom:14px}
+.track .s{flex-grow:1;border-radius:6px;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;font-family:var(--num);font-weight:600;font-size:.95rem;color:var(--muted);position:relative;overflow:hidden}
+.track .s .fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--blue);opacity:.28}
+.track .s.cur{color:var(--ink);outline:2px solid var(--blue)}
+.track .s.done{color:var(--ink)}
+.track .s.done .fill{width:100%}
+.track .s span{position:relative}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat .v{font-family:var(--num);font-weight:600;font-size:1.9rem;line-height:1;font-variant-numeric:tabular-nums}
+.stat .l{color:var(--muted);font-size:.85rem}
+
+.adj{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.adj button{flex:1;padding:10px;border-radius:12px;border:1px solid var(--line);background:transparent;font-family:var(--num);font-weight:600;font-size:1.15rem}
+.adj .lab{flex:2;text-align:center;color:var(--muted);font-size:.9rem}
+
+.ctrl{display:flex;gap:10px}
+.ctrl button{flex:1;padding:16px 10px;border-radius:16px;border:0;font-family:var(--num);font-weight:700;font-size:1.35rem}
+.go{background:var(--blue);color:#fff}
+.pause{background:var(--amber);color:#14202B}
+.stop{background:transparent;border:2px solid var(--line)!important;color:var(--ink)}
+.ctrl button[hidden]{display:none}
+
+.msg{margin-top:10px;font-size:.92rem;color:var(--muted);min-height:1.2em}
+.msg.err{color:var(--red)}
+
+/* Configuração */
+.card{margin-top:18px;background:var(--panel);border-radius:18px;padding:16px;border:1px solid var(--line)}
+.seg{display:grid;grid-template-columns:2.2rem 1fr 1fr 2.4rem;gap:8px;align-items:center;margin-bottom:8px}
+.seg .i{font-family:var(--num);font-weight:600;font-size:1.2rem;color:var(--muted);text-align:center}
+.seg label{display:flex;flex-direction:column;font-size:.78rem;color:var(--muted)}
+.seg input{margin-top:2px;width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-family:var(--num);font-size:1.25rem;font-weight:600}
+.seg .del{height:42px;margin-top:16px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:1.2rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.btn2{padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:transparent;font-weight:500}
+.hint{color:var(--muted);font-size:.9rem;margin:10px 0 0}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.opt:first-of-type{border-top:0}
+.opt select,.opt input[type=range]{max-width:55%}
+.opt select{padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--blue)}
+.splits{margin:0;padding:0;list-style:none}
+.splits li{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.splits li:first-child{border-top:0}
+.splits .empty{color:var(--muted)}
+details summary{cursor:pointer;font-weight:600}
+details p{color:var(--muted);font-size:.92rem}
+@media (prefers-reduced-motion: reduce){.beat i{transition:none}}
+
+/* Tela bloqueada */
+#lockBtn{background:var(--ink);color:var(--bg)}
+.lock{position:fixed;inset:0;z-index:50;background:#000;color:#5a5a5a;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 40px) 24px calc(env(safe-area-inset-bottom,0px) + 40px);touch-action:none;-webkit-user-select:none;user-select:none}
+.lock[hidden]{display:none}
+.lock .lc{font-family:var(--num);font-weight:700;font-size:7rem;line-height:1;text-align:center}
+.lock .lc small{display:block;font-size:1.2rem;font-weight:500}
+.lock .ld{font-family:var(--num);font-size:1.6rem;text-align:center}
+.slide{width:100%;max-width:340px;text-align:center;font-size:.95rem}
+.slide input{-webkit-appearance:none;appearance:none;width:100%;height:64px;border-radius:32px;background:#1a1a1a;margin-top:10px;touch-action:pan-x}
+.slide input::-webkit-slider-thumb{-webkit-appearance:none;width:64px;height:64px;border-radius:50%;background:#444;border:0}
+
+/* Músicas */
+.songs{list-style:none;margin:0 0 10px;padding:0}
+.songs li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.songs li:first-child{border-top:0}
+.songs li.cur .nm{color:var(--blue);font-weight:600}
+.songs .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;background:none;border:0;padding:6px 0}
+.songs .x{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted)}
+.songs .empty{color:var(--muted)}
+.player{display:flex;gap:8px;align-items:center;margin-top:6px}
+.player button{width:56px;height:48px;border-radius:12px;border:1px solid var(--line);background:transparent;font-size:1.2rem}
+.player .pp{flex:1;width:auto;background:var(--blue);color:#fff;border:0;font-family:var(--num);font-weight:700;font-size:1.2rem}
+.now{color:var(--muted);font-size:.9rem;margin:10px 0 4px;min-height:1.3em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addm{display:inline-block;padding:10px 14px;border-radius:12px;border:1px solid var(--line);font-weight:500;cursor:pointer}
+.addm input{position:absolute;width:1px;height:1px;opacity:0}
+</style>
+</head>
+<body>
+<main>
+  <h1>Cadência por km</h1>
+
+  <section class="live" aria-live="polite">
+    <div class="top">
+      <span id="segLabel">Trecho 1 de 4</span>
+      <span class="gps"><span class="dot" id="gpsDot"></span><span id="gpsTxt">GPS parado</span></span>
+    </div>
+    <div class="cad"><span class="n" id="cadNow">165</span><span class="u">passos/min</span></div>
+    <div class="beat"><i id="beat"></i></div>
+    <div class="next" id="nextTxt">Próximo: <b>170</b> em 1,00 km</div>
+
+    <div class="track" id="track"></div>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="dist">0,00</div><div class="l">km</div></div>
+      <div class="stat"><div class="v" id="time">0:00</div><div class="l">tempo</div></div>
+      <div class="stat"><div class="v" id="pace">–:––</div><div class="l">ritmo /km</div></div>
+    </div>
+
+    <div class="adj">
+      <button id="minus" aria-label="Diminuir 5 passos por minuto">−5</button>
+      <span class="lab">Ajuste do trecho atual</span>
+      <button id="plus" aria-label="Aumentar 5 passos por minuto">+5</button>
+    </div>
+
+    <div class="ctrl">
+      <button class="go" id="btnStart">Iniciar</button>
+      <button class="pause" id="btnPause" hidden>Pausar</button>
+      <button class="stop" id="btnStop" hidden>Encerrar</button>
+    </div>
+    <div class="ctrl" style="margin-top:10px">
+      <button id="lockBtn" hidden>Bloquear tela para o bolso</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <div class="lock" id="lock" hidden>
+    <div class="lc"><span id="lkCad">165</span><small>passos/min</small></div>
+    <div class="ld"><span id="lkDist">0,00</span> km · <span id="lkTime">0:00</span></div>
+    <div class="slide">Deslize para desbloquear<input type="range" id="unlock" min="0" max="100" value="0" aria-label="Deslize para desbloquear"></div>
+  </div>
+
+  <section class="card">
+    <h2>Trechos</h2>
+    <div id="segs"></div>
+    <div class="row">
+      <button class="btn2" id="addSeg">Adicionar trecho</button>
+      <button class="btn2" id="resetSeg">Voltar ao padrão</button>
+    </div>
+    <p class="hint">Depois do último trecho, a cadência final continua até você encerrar.</p>
+  </section>
+
+  <section class="card">
+    <h2>Som e tela</h2>
+    <div class="opt"><span>Som da batida</span>
+      <select id="sound">
+        <option value="click">Clique</option>
+        <option value="wood">Madeira</option>
+        <option value="beep">Bipe</option>
+      </select></div>
+    <div class="opt"><span>Volume</span><input type="range" id="vol" min="0.1" max="1" step="0.05" value="0.8"></div>
+    <div class="opt"><span>Tocar junto com música<br><small style="color:var(--muted)">Com o iPhone no silencioso, o metrônomo fica mudo</small></span><input type="checkbox" id="mix" checked></div>
+    <div class="opt"><span>Anunciar troca de trecho por voz</span><input type="checkbox" id="voice" checked></div>
+    <div class="opt"><span>Modo teste (sem GPS)</span><input type="checkbox" id="test"></div>
+    <div class="row" id="testRow" hidden>
+      <button class="btn2" id="add100">+100 m</button>
+      <button class="btn2" id="add500">+500 m</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Músicas</h2>
+    <ul class="songs" id="songs"><li class="empty">Nenhuma música ainda.</li></ul>
+    <label class="addm">Adicionar músicas<input type="file" id="musicIn" accept="audio/*,video/*,.mp3,.m4a,.mp4,.mov,.aac,.wav" multiple></label>
+    <div class="now" id="nowPlaying"></div>
+    <div class="player">
+      <button id="mPrev" aria-label="Música anterior">⏮</button>
+      <button class="pp" id="mPlay">Tocar</button>
+      <button id="mNext" aria-label="Próxima música">⏭</button>
+    </div>
+    <div class="opt" style="margin-top:8px"><span>Volume da música</span><input type="range" id="mVol" min="0" max="1" step="0.05" value="0.7"></div>
+    <p class="hint">As músicas ficam guardadas no app, neste iPhone. Tocando por aqui, funcionam com a chave de silencioso ligada.</p>
+  </section>
+
+  <section class="card">
+    <h2>Parciais</h2>
+    <ul class="splits" id="splits"><li class="empty">Aparecem aqui a cada km completo.</li></ul>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Como usar no iPhone</summary>
+      <p>Abra no Safari, toque em Compartilhar e escolha “Adicionar à Tela de Início”. Ao iniciar, permita o acesso à localização.</p>
+      <p>Depois de abrir uma vez com internet, o app passa a funcionar sem sinal. O GPS não precisa de internet.</p>
+      <p>Deixe a tela ligada durante a corrida (o app tenta impedir que ela apague sozinha). Se a tela travar ou você trocar de app, o iOS pausa o GPS e o metrônomo. Abaixe o brilho para economizar bateria.</p>
+      <p>Para o bolso: toque em “Bloquear tela para o bolso”. A tela fica preta e ignora toques até você deslizar a barra. Para impedir também o gesto de sair do app, use o Acesso Guiado (Ajustes › Acessibilidade › Acesso Guiado).</p>
+      <p>Se não ouvir as batidas, confira o volume e a chave de silencioso do iPhone. Com “Tocar junto com música” ligado, a chave de silencioso deixa o metrônomo mudo.</p>
+    </details>
+  </section>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var DEFAULT = [{km:1,spm:165},{km:1,spm:170},{km:1,spm:175},{km:1,spm:180}];
+  var KEY = "cadencia-km-v1";
+  var $ = function(id){return document.getElementById(id)};
+
+  // ---------- Config ----------
+  var cfg = {segs: DEFAULT.map(function(s){return {km:s.km,spm:s.spm}}), sound:"click", vol:0.8, voice:true, mix:true};
+  try{
+    var saved = JSON.parse(localStorage.getItem(KEY) || "null");
+    if(saved && Array.isArray(saved.segs) && saved.segs.length){ cfg = Object.assign(cfg, saved); }
+  }catch(e){}
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(cfg)); }catch(e){} }
+
+  // ---------- Estado ----------
+  var st = {running:false, paused:false, dist:0, elapsed:0, t0:0, last:null, segIdx:0,
+            offsets:{}, watchId:null, splits:[], lastSplitAt:0, lastSplitDist:0};
+
+  function fmtKm(m){ return (m/1000).toFixed(2).replace(".",","); }
+  function fmtTime(s){ s=Math.floor(s); var h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60;
+    return (h? h+":"+String(m).padStart(2,"0") : m)+":"+String(x).padStart(2,"0"); }
+  function bounds(){ var acc=0; return cfg.segs.map(function(s){ var a=acc; acc+=s.km*1000; return [a,acc]; }); }
+  function segAt(d){ var b=bounds(); for(var i=0;i<b.length;i++){ if(d<b[i][1]) return i; } return b.length-1; }
+  function spmFor(i){ return Math.max(100, Math.min(240, cfg.segs[i].spm + (st.offsets[i]||0))); }
+  function curSpm(){ return spmFor(st.segIdx); }
+  function elapsedNow(){ return st.elapsed + (st.running && !st.paused ? (performance.now()-st.t0)/1000 : 0); }
+
+  // ---------- Áudio ----------
+  var appMusic=false;
+  var ctx=null, nextT=0, sched=null, beatQueue=[];
+  function setSession(){
+    try{ if(navigator.audioSession) navigator.audioSession.type = (cfg.mix && !appMusic) ? "ambient" : "playback"; }catch(e){}
+  }
+  function initAudio(){
+    setSession();
+    if(!ctx){ var AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); }
+    if(ctx.state==="suspended") ctx.resume();
+    // destrava áudio no iOS
+    var b=ctx.createBuffer(1,1,22050), s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.start(0);
+  }
+  function tone(t, freq, dur, type, vol){
+    var o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+dur+0.02);
+  }
+  function click(t){
+    var v=cfg.vol;
+    if(cfg.sound==="wood"){ tone(t,1800,0.035,"triangle",v); tone(t,900,0.05,"sine",v*0.6); }
+    else if(cfg.sound==="beep"){ tone(t,880,0.06,"sine",v); }
+    else { tone(t,2500,0.02,"square",v*0.5); tone(t,1200,0.03,"sine",v*0.6); }
+    beatQueue.push(t);
+  }
+  function chime(){
+    if(!ctx) return; var t=ctx.currentTime+0.05, v=cfg.vol;
+    tone(t,988,0.18,"sine",v); tone(t+0.2,1319,0.28,"sine",v);
+  }
+  function metroStart(){
+    nextT = ctx.currentTime + 0.1;
+    clearInterval(sched);
+    sched = setInterval(function(){
+      while(nextT < ctx.currentTime + 0.12){ click(nextT); nextT += 60/curSpm(); }
+    },25);
+  }
+  function metroStop(){ clearInterval(sched); sched=null; }
+  function speak(text){
+    if(!cfg.voice || !("speechSynthesis" in window)) return;
+    try{ var u=new SpeechSynthesisUtterance(text); u.lang="pt-BR"; u.rate=1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){}
+  }
+
+  // pulso visual sincronizado
+  (function loop(){
+    if(ctx){ while(beatQueue.length && beatQueue[0] <= ctx.currentTime){ beatQueue.shift(); flash(); } }
+    if(st.running) renderLive();
+    requestAnimationFrame(loop);
+  })();
+  function flash(){ var b=$("beat"); b.classList.add("on"); requestAnimationFrame(function(){ requestAnimationFrame(function(){ b.classList.remove("on"); }); }); }
+
+  // ---------- Tela ligada ----------
+  var lock=null;
+  async function keepAwake(){
+    try{ if("wakeLock" in navigator){ lock = await navigator.wakeLock.request("screen"); } }catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState==="visible" && st.running && !st.paused){
+      keepAwake(); if(ctx && ctx.state!=="running") ctx.resume();
+    }
+  });
+
+  // ---------- GPS ----------
+  function hav(a,b){
+    var R=6371000, r=Math.PI/180, dLat=(b.lat-a.lat)*r, dLon=(b.lon-a.lon)*r;
+    var x=Math.sin(dLat/2)**2 + Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(x));
+  }
+  function setGps(cls, txt){ $("gpsDot").className="dot "+cls; $("gpsTxt").textContent=txt; }
+  function onPos(p){
+    var c=p.coords, acc=c.accuracy;
+    setGps(acc<=15?"good":acc<=30?"weak":"bad", "GPS ±"+Math.round(acc)+" m");
+    if(!st.running || st.paused || $("test").checked) return;
+    if(acc>35) return;
+    var pt={lat:c.latitude, lon:c.longitude, t:p.timestamp};
+    if(!st.last){ st.last=pt; return; }
+    var d=hav(st.last,pt), dt=(pt.t-st.last.t)/1000;
+    if(d < Math.max(4, acc*0.4)) return;          // ruído parado
+    if(dt>0 && d/dt > 9){ st.last=pt; return; }    // salto impossível p/ corrida
+    st.last=pt; addDist(d);
+  }
+  function onErr(e){
+    if(e.code===1){ setGps("bad","Sem permissão"); showMsg("Permita a localização para o Safari em Ajustes › Privacidade › Serviços de Localização.", true); }
+    else setGps("bad","Sem sinal");
+  }
+  function gpsStart(){
+    if(!("geolocation" in navigator)){ showMsg("Este navegador não oferece GPS.", true); return; }
+    if(st.watchId!==null) return;
+    setGps("", "Procurando…");
+    st.watchId = navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  }
+  function gpsStop(){ if(st.watchId!==null){ navigator.geolocation.clearWatch(st.watchId); st.watchId=null; } setGps("","GPS parado"); }
+
+  // ---------- Distância e trechos ----------
+  function addDist(d){
+    st.dist += d;
+    // parciais por km
+    while(st.dist >= (st.splits.length+1)*1000){
+      var now=elapsedNow(), kmT = now - st.lastSplitAt;
+      st.splits.push(kmT); st.lastSplitAt = now; renderSplits();
+    }
+    var idx = segAt(st.dist);
+    if(idx !== st.segIdx){
+      st.segIdx = idx; chime();
+      speak("Trecho "+(idx+1)+". Cadência "+curSpm()+".");
+      renderTrack();
+    }
+  }
+
+  // ---------- Controles ----------
+  function showMsg(t,err){ var m=$("msg"); m.textContent=t||""; m.className="msg"+(err?" err":""); }
+  $("btnStart").onclick = function(){
+    initAudio();
+    if(!st.running){
+      st.running=true; st.paused=false; st.dist=0; st.elapsed=0; st.last=null; st.segIdx=0;
+      st.offsets={}; st.splits=[]; st.lastSplitAt=0; renderSplits();
+      speak("Começando. Cadência "+curSpm()+".");
+    } else { st.paused=false; st.last=null; }
+    st.t0=performance.now();
+    metroStart(); keepAwake(); if(!$("test").checked) gpsStart();
+    $("btnStart").hidden=true; $("btnPause").hidden=false; $("btnStop").hidden=false; $("lockBtn").hidden=false;
+    showMsg(""); renderAll();
+  };
+  $("btnPause").onclick = function(){
+    st.elapsed = elapsedNow(); st.paused=true; metroStop(); gpsStop();
+    if(lock){ lock.release().catch(function(){}); lock=null; }
+    $("btnStart").textContent="Continuar"; $("btnStart").hidden=false; $("btnPause").hidden=true; $("lockBtn").hidden=true;
+    showMsg("Pausado.");
+  };
+  $("btnStop").onclick = function(){
+    st.elapsed = elapsedNow(); st.running=false; st.paused=false; metroStop(); gpsStop();
+    if(lock){ lock.release().catch(function(){}); lock=null; }
+    $("btnStart").textContent="Iniciar"; $("btnStart").hidden=false; $("btnPause").hidden=true; $("btnStop").hidden=true; $("lockBtn").hidden=true;
+    showMsg("Corrida encerrada: "+fmtKm(st.dist)+" km em "+fmtTime(st.elapsed)+".");
+    renderAll();
+  };
+  function adjust(n){ st.offsets[st.segIdx]=(st.offsets[st.segIdx]||0)+n; renderAll(); }
+  $("minus").onclick=function(){adjust(-5)}; $("plus").onclick=function(){adjust(5)};
+  $("add100").onclick=function(){ if(st.running&&!st.paused) addDist(100); };
+  $("add500").onclick=function(){ if(st.running&&!st.paused) addDist(500); };
+  $("test").onchange=function(){
+    $("testRow").hidden=!this.checked;
+    if(this.checked) gpsStop(); else if(st.running && !st.paused) gpsStart();
+  };
+  $("sound").value=cfg.sound; $("vol").value=cfg.vol; $("voice").checked=cfg.voice;
+  $("sound").onchange=function(){cfg.sound=this.value;save();};
+  $("vol").oninput=function(){cfg.vol=parseFloat(this.value);save();};
+  $("voice").onchange=function(){cfg.voice=this.checked;save();};
+  $("mix").checked=cfg.mix!==false;
+  $("mix").onchange=function(){cfg.mix=this.checked;save();setSession();};
+
+  // ---------- Editor de trechos ----------
+  function renderSegs(){
+    var box=$("segs"); box.innerHTML="";
+    cfg.segs.forEach(function(s,i){
+      var r=document.createElement("div"); r.className="seg";
+      r.innerHTML='<span class="i">'+(i+1)+'</span>'+
+        '<label>Distância (km)<input type="number" inputmode="decimal" min="0.1" step="0.1" value="'+s.km+'"></label>'+
+        '<label>Passos/min<input type="number" inputmode="numeric" min="100" max="240" step="1" value="'+s.spm+'"></label>'+
+        '<button class="del" aria-label="Remover trecho '+(i+1)+'">×</button>';
+      var ins=r.querySelectorAll("input");
+      ins[0].onchange=function(){ var v=parseFloat(String(this.value).replace(",", ".")); if(v>0){ s.km=Math.round(v*100)/100; save(); renderAll(); } else this.value=s.km; };
+      ins[1].onchange=function(){ var v=parseInt(this.value,10); if(v>=100&&v<=240){ s.spm=v; save(); renderAll(); } else this.value=s.spm; };
+      r.querySelector(".del").onclick=function(){ if(cfg.segs.length>1){ cfg.segs.splice(i,1); save(); renderSegs(); renderAll(); } };
+      box.appendChild(r);
+    });
+  }
+  $("addSeg").onclick=function(){ var l=cfg.segs[cfg.segs.length-1]; cfg.segs.push({km:1,spm:Math.min(240,l.spm+5)}); save(); renderSegs(); renderAll(); };
+  $("resetSeg").onclick=function(){ cfg.segs=DEFAULT.map(function(s){return {km:s.km,spm:s.spm}}); save(); renderSegs(); renderAll(); };
+
+  // ---------- Render ----------
+  function renderTrack(){
+    var t=$("track"); t.innerHTML=""; var b=bounds();
+    cfg.segs.forEach(function(s,i){
+      var d=document.createElement("div"); d.className="s"; d.style.flexGrow=s.km;
+      d.innerHTML='<div class="fill"></div><span>'+spmFor(i)+'</span>';
+      t.appendChild(d);
+    });
+    updateTrack();
+  }
+  function updateTrack(){
+    var b=bounds(), kids=$("track").children;
+    for(var i=0;i<kids.length;i++){
+      var k=kids[i], last=i===kids.length-1;
+      k.classList.toggle("cur", i===st.segIdx);
+      k.classList.toggle("done", i<st.segIdx);
+      var f=k.firstChild;
+      if(i===st.segIdx){ var p=(st.dist-b[i][0])/(b[i][1]-b[i][0]); f.style.width=Math.min(100,Math.max(0,p*100))+"%"; }
+      else f.style.width = i<st.segIdx ? "100%" : "0";
+      k.lastChild.textContent=spmFor(i);
+    }
+  }
+  function renderLive(){
+    $("dist").textContent=fmtKm(st.dist);
+    var el=elapsedNow(); $("time").textContent=fmtTime(el);
+    $("pace").textContent = st.dist>50 ? fmtTime(el/(st.dist/1000)) : "–:––";
+    updateTrack();
+    var b=bounds(), i=st.segIdx;
+    if(i<cfg.segs.length-1){
+      $("nextTxt").innerHTML='Próximo: <b>'+spmFor(i+1)+'</b> em '+fmtKm(Math.max(0,b[i][1]-st.dist))+' km';
+    } else {
+      $("nextTxt").textContent = st.dist>=b[i][1] ? "Plano completo — mantendo a cadência final" : "Último trecho, faltam "+fmtKm(b[i][1]-st.dist)+" km";
+    }
+  }
+  function renderAll(){
+    if(!st.running && st.dist===0) st.segIdx=0;
+    $("cadNow").textContent=curSpm();
+    $("segLabel").textContent="Trecho "+(st.segIdx+1)+" de "+cfg.segs.length;
+    renderTrack(); renderLive();
+  }
+  // cadência grande sempre atual
+  setInterval(function(){
+    $("cadNow").textContent=curSpm();
+    $("segLabel").textContent="Trecho "+(st.segIdx+1)+" de "+cfg.segs.length;
+  },250);
+  function renderSplits(){
+    var ul=$("splits");
+    if(!st.splits.length){ ul.innerHTML='<li class="empty">Aparecem aqui a cada km completo.</li>'; return; }
+    ul.innerHTML=st.splits.map(function(s,i){ return '<li><span>Km '+(i+1)+'</span><span>'+fmtTime(s)+'</span></li>'; }).join("");
+  }
+
+  // ---------- Bloqueio de tela ----------
+  function setLock(on){
+    $("lock").hidden=!on; $("unlock").value=0;
+    if(on){ keepAwake(); updLock(); }
+  }
+  function updLock(){
+    if($("lock").hidden) return;
+    $("lkCad").textContent=curSpm(); $("lkDist").textContent=fmtKm(st.dist); $("lkTime").textContent=fmtTime(elapsedNow());
+  }
+  setInterval(updLock,500);
+  $("lockBtn").onclick=function(){ setLock(true); };
+  function tryUnlock(){ var u=$("unlock"); if(+u.value>=92) setLock(false); else u.value=0; }
+  $("unlock").addEventListener("change",tryUnlock);
+  $("unlock").addEventListener("touchend",tryUnlock);
+  ["touchstart","touchmove","click","dblclick","gesturestart"].forEach(function(ev){
+    $("lock").addEventListener(ev,function(e){ if(e.target!==$("unlock")) e.preventDefault(); },{passive:false});
+  });
+
+  // ---------- Músicas guardadas no app ----------
+  var db=null, songs=[], tempSongs=[], cur=-1, curUrl=null, mEl=document.createElement("video"), mGain=null;
+  mEl.preload="auto"; mEl.playsInline=true; mEl.setAttribute("playsinline",""); mEl.setAttribute("webkit-playsinline","");
+  mEl.style.cssText="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;bottom:0";
+  document.body.appendChild(mEl);
+  cfg.mVol = cfg.mVol==null ? 0.7 : cfg.mVol; $("mVol").value=cfg.mVol;
+  function idb(){
+    return new Promise(function(res,rej){
+      if(db) return res(db);
+      var r=indexedDB.open("cadencia-musicas",1);
+      r.onupgradeneeded=function(){ r.result.createObjectStore("songs",{keyPath:"id",autoIncrement:true}); };
+      r.onsuccess=function(){ db=r.result; res(db); };
+      r.onerror=function(){ rej(r.error); };
+    });
+  }
+  function req(mode, fn){
+    return idb().then(function(d){ return new Promise(function(res,rej){
+      var t=d.transaction("songs",mode), q=fn(t.objectStore("songs"));
+      t.oncomplete=function(){ res(q?q.result:undefined); };
+      t.onerror=t.onabort=function(){ rej(t.error); };
+    }); });
+  }
+  function loadSongs(){
+    return req("readonly",function(st){ return st.getAll(); }).then(function(all){
+      var keep=null;
+      songs.forEach(function(x){ if(x.url && x.url===mEl.src) keep=x; else if(x.url) URL.revokeObjectURL(x.url); });
+      songs=(all||[]).map(function(x){ return (keep && keep.id===x.id) ? keep : {id:x.id,name:x.name,url:URL.createObjectURL(x.blob)}; }).concat(tempSongs); renderSongs();
+    }).catch(function(){ songs=tempSongs.slice(); renderSongs(); });
+  }
+  function renderSongs(){
+    var ul=$("songs");
+    if(!songs.length){ ul.innerHTML='<li class="empty">Nenhuma música ainda.</li>'; return; }
+    ul.innerHTML="";
+    songs.forEach(function(sg,i){
+      var li=document.createElement("li"); if(i===cur) li.className="cur";
+      var b=document.createElement("button"); b.className="nm"; b.textContent=sg.name+(sg.temp?" (só nesta sessão)":""); b.onclick=function(){ playSong(i); };
+      var x=document.createElement("button"); x.className="x"; x.textContent="×"; x.setAttribute("aria-label","Apagar "+sg.name);
+      x.onclick=function(){
+        if(!confirm("Apagar “"+sg.name+"” do app?")) return;
+        (sg.temp ? Promise.resolve(tempSongs=tempSongs.filter(function(t){return t!==sg;}))
+                 : req("readwrite",function(st){ return st.delete(sg.id); })).then(function(){
+          if(i===cur){ mEl.pause(); cur=-1; setPlayLabel(); $("nowPlaying").textContent=""; }
+          else if(i<cur) cur--;
+          loadSongs();
+        });
+      };
+      li.appendChild(b); li.appendChild(x); ul.appendChild(li);
+    });
+  }
+  $("musicIn").onchange=async function(){
+    var files=[].slice.call(this.files||[]); this.value="";
+    if(!files.length) return;
+    try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+    $("nowPlaying").textContent="Guardando "+files.length+" arquivo(s)…";
+    var falhou=0;
+    for(var i=0;i<files.length;i++){
+      var f=files[i], ext=(f.name.split(".").pop()||"").toLowerCase();
+      var type=f.type || ({mp3:"audio/mpeg",m4a:"audio/mp4",mp4:"video/mp4",mov:"video/quicktime",aac:"audio/aac",wav:"audio/wav"}[ext]) || "audio/mpeg";
+      var nome=f.name.replace(/\.[^.]+$/,"");
+      try{
+        var blob=f.slice(0,f.size,type);
+        await req("readwrite",function(st){ return st.add({name:nome, blob:blob, added:Date.now()}); });
+      }catch(e){
+        falhou++;
+        tempSongs.push({id:"t"+Date.now()+i, name:nome, url:URL.createObjectURL(f), temp:true});
+      }
+    }
+    $("nowPlaying").textContent = falhou
+      ? falhou+" arquivo(s) grande(s) demais para guardar. Tocam agora, mas somem ao fechar o app."
+      : "Pronto.";
+    loadSongs();
+  };
+  function musicGraph(){
+    initAudio();
+    if(!mGain){
+      try{ var src=ctx.createMediaElementSource(mEl); mGain=ctx.createGain(); src.connect(mGain); mGain.connect(ctx.destination); }catch(e){}
+    }
+    if(mGain) mGain.gain.value=cfg.mVol;
+  }
+  function setPlayLabel(){ $("mPlay").textContent = (!mEl.paused && cur>=0) ? "Pausar" : "Tocar"; }
+  function playSong(i){
+    if(!songs.length) return;
+    i=(i+songs.length)%songs.length;
+    appMusic=true; setSession(); musicGraph();
+    // tocar na mesma hora do toque: o iOS bloqueia som iniciado depois
+    mEl.src=songs[i].url; cur=i;
+    $("nowPlaying").textContent="Tocando: "+songs[i].name;
+    var p=mEl.play();
+    if(p && p.then){
+      p.then(function(){ setPlayLabel(); renderSongs(); })
+       .catch(function(e){
+         $("nowPlaying").textContent = (e && e.name==="NotAllowedError")
+           ? "Toque em Tocar para começar." : "Não consegui tocar esse arquivo ("+(e&&e.name||"erro")+").";
+         setPlayLabel(); renderSongs();
+       });
+    } else { setPlayLabel(); renderSongs(); }
+  }
+  $("mPlay").onclick=function(){
+    if(cur<0){ playSong(0); return; }
+    if(mEl.paused){ appMusic=true; setSession(); musicGraph(); mEl.play().then(setPlayLabel).catch(function(){}); }
+    else { mEl.pause(); appMusic=false; setSession(); setPlayLabel(); }
+  };
+  $("mNext").onclick=function(){ playSong(cur+1); };
+  $("mPrev").onclick=function(){ playSong(cur<0?0:cur-1); };
+  mEl.addEventListener("ended",function(){ playSong(cur+1); });
+  mEl.addEventListener("pause",setPlayLabel);
+  mEl.addEventListener("play",setPlayLabel);
+  $("mVol").oninput=function(){ cfg.mVol=parseFloat(this.value); save(); if(mGain) mGain.gain.value=cfg.mVol; };
+  if("indexedDB" in window) loadSongs();
+
+  // modo offline
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+
+  renderSegs(); renderAll();
+})();
+</script>
+</body>
+</html>
